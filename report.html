@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System - Report</title>
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        .graph-wrapper {
+            width: 100%;
+            overflow-x: auto;
+            border: 1px solid #e0e0e0;
+            border-radius: 6px;
+            padding: 12px;
+            background: #fff;
+        }
+
+        .graph-summary, .tool-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+            align-items: center;
+        }
+
+        .graph-pill {
+            background: #f4f6f8;
+            border: 1px solid #dfe4ea;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+
+        .legend-row {
+            display: flex;
+            gap: 14px;
+            margin-top: 10px;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-box { width: 14px; height: 14px; display: inline-block; border-radius: 3px; }
+        .present-box { background: #27ae60; }
+        .absent-box { background: #e74c3c; }
+
+        .warning-row {
+            background: #fff5f5 !important;
+        }
+
+        .badge-warning {
+            background-color: #fdebd0;
+            color: #9a5b00;
+        }
+
+        .btn-secondary {
+            background-color: #7f8c8d;
+            color: #fff;
+        }
+
+        .btn-secondary:hover { background-color: #626f70; }
+
+        .btn-warning-main {
+            background-color: #f39c12;
+            color: #fff;
+        }
+
+        .btn-warning-main:hover { background-color: #d68910; }
+
+        .small-note {
+            color: #777;
+            font-size: 13px;
+            margin-top: 8px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Student Attendance System</span>
+    <a href="index.html">Home</a>
+    <a href="students.html">Students</a>
+    <a href="attendance.html">Mark Attendance</a>
+    <a href="report.html" class="active">Report</a>
+</nav>
+
+<div class="container">
+
+    <div class="card">
+        <h2>Attendance Report</h2>
+        <p style="color:#666; font-size:14px; margin-bottom:16px;">
+            View attendance records. Use filters to narrow results.
+        </p>
+
+        <div class="filter-row">
+            <div class="form-group">
+                <label for="filter-date">Filter by Date</label>
+                <select id="filter-date">
+                    <option value="">Loading dates...</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="filter-dept">Filter by Department</label>
+                <select id="filter-dept">
+                    <option value="">Loading departments...</option>
+                </select>
+            </div>
+            <button class="btn btn-primary" onclick="loadReport()" style="height:38px;">Apply Filter</button>
+            <button class="btn" onclick="clearFilters()" style="height:38px; background:#e0e0e0; color:#333;">Clear</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Export / Import Report</h2>
+
+        <div class="alert alert-success" id="import-success"></div>
+        <div class="alert alert-error" id="import-error"></div>
+
+        <div class="tool-row">
+            <button class="btn btn-success" onclick="exportReportCSV()">Export Current Report CSV</button>
+            <input type="file" id="import-file" accept=".csv" style="max-width:260px;">
+            <button class="btn btn-warning-main" onclick="importReportCSV()">Import Attendance CSV</button>
+        </div>
+
+        <p class="small-note">
+            Import CSV format: <b>USN, Date, Status</b>. Example: <b>1SP24CS001, 2026-05-17, Present</b>.
+            Status must be <b>Present</b> or <b>Absent</b>. Existing records for the same USN and date will be updated.
+        </p>
+    </div>
+
+    <div class="card">
+        <h2>Attendance Graph</h2>
+        <div class="graph-summary">
+            <span class="graph-pill">Total Present: <span id="sum-present">0</span></span>
+            <span class="graph-pill">Total Absent: <span id="sum-absent">0</span></span>
+            <span class="graph-pill">Total Records: <span id="sum-records">0</span></span>
+        </div>
+
+        <div class="graph-wrapper">
+            <canvas id="attendanceChart" width="900" height="320"></canvas>
+        </div>
+
+        <div class="legend-row">
+            <div class="legend-item"><span class="legend-box present-box"></span> Present</div>
+            <div class="legend-item"><span class="legend-box absent-box"></span> Absent</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Attendance Percentage</h2>
+        <p style="color:#666; font-size:14px; margin-bottom:12px;">
+            Students below 75% are highlighted as low attendance.
+        </p>
+        <div id="percentage-table">
+            <p class="empty-msg">Loading percentage...</p>
+        </div>
+    </div>
+
+    <div class="card">
+        <h2>Records <span id="record-count" style="font-size:14px; color:#888;"></span></h2>
+        <div id="report-table">
+            <p class="empty-msg">Loading report...</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let currentRecords = [];
+
+    loadAvailableFilters();
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function loadAvailableFilters() {
+        fetch("api/attendance.php")
+            .then(res => res.json())
+            .then(records => {
+                const dateSelect = document.getElementById("filter-date");
+                const deptSelect = document.getElementById("filter-dept");
+
+                const dates = [...new Set(records.map(r => r.date).filter(Boolean))].sort().reverse();
+                const departments = [...new Set(records.map(r => r.department).filter(Boolean))].sort();
+
+                const oldDate = dateSelect.value;
+                const oldDept = deptSelect.value;
+
+                dateSelect.innerHTML = '<option value="">All available dates</option>';
+                deptSelect.innerHTML = '<option value="">All available departments</option>';
+
+                dates.forEach(date => {
+                    const option = document.createElement("option");
+                    option.value = date;
+                    option.textContent = date;
+                    dateSelect.appendChild(option);
+                });
+
+                departments.forEach(dept => {
+                    const option = document.createElement("option");
+                    option.value = dept;
+                    option.textContent = dept;
+                    deptSelect.appendChild(option);
+                });
+
+                dateSelect.value = dates.includes(oldDate) ? oldDate : "";
+                deptSelect.value = departments.includes(oldDept) ? oldDept : "";
+
+                loadReport();
+            })
+            .catch(() => {
+                document.getElementById("filter-date").innerHTML = '<option value="">Could not load dates</option>';
+                document.getElementById("filter-dept").innerHTML = '<option value="">Could not load departments</option>';
+                loadReport();
+            });
+    }
+
+    function buildReportUrl() {
+        const date = document.getElementById("filter-date").value;
+        const dept = document.getElementById("filter-dept").value;
+
+        let url = "api/attendance.php";
+        const params = [];
+        if (date) params.push("date=" + encodeURIComponent(date));
+        if (dept) params.push("department=" + encodeURIComponent(dept));
+        if (params.length > 0) url += "?" + params.join("&");
+        return url;
+    }
+
+    function loadReport() {
+        document.getElementById("report-table").innerHTML = '<p class="empty-msg">Loading...</p>';
+        document.getElementById("percentage-table").innerHTML = '<p class="empty-msg">Loading percentage...</p>';
+
+        fetch(buildReportUrl())
+            .then(res => res.json())
+            .then(records => {
+                currentRecords = Array.isArray(records) ? records : [];
+                document.getElementById("record-count").textContent = `(${currentRecords.length} records)`;
+
+                drawAttendanceGraph(currentRecords);
+                buildPercentageTable(currentRecords);
+                buildRecordsTable(currentRecords);
+            })
+            .catch(() => {
+                currentRecords = [];
+                drawAttendanceGraph([]);
+                document.getElementById("percentage-table").innerHTML = '<p class="empty-msg">Failed to load percentage.</p>';
+                document.getElementById("report-table").innerHTML = '<p class="empty-msg">Failed to load report. Is XAMPP running?</p>';
+            });
+    }
+
+    function buildRecordsTable(records) {
+        if (records.length === 0) {
+            document.getElementById("report-table").innerHTML = '<p class="empty-msg">No records found for the selected filters.</p>';
+            return;
+        }
+
+        let html = `<table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>USN</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Date</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        records.forEach((r, i) => {
+            const badge = r.status === "Present"
+                ? `<span class="badge badge-present">Present</span>`
+                : `<span class="badge badge-absent">Absent</span>`;
+
+            html += `<tr>
+                <td>${i + 1}</td>
+                <td>${escapeHtml(r.usn)}</td>
+                <td>${escapeHtml(r.name)}</td>
+                <td>${escapeHtml(r.department)}</td>
+                <td>${escapeHtml(r.date)}</td>
+                <td>${badge}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        document.getElementById("report-table").innerHTML = html;
+    }
+
+    function buildPercentageTable(records) {
+        if (records.length === 0) {
+            document.getElementById("percentage-table").innerHTML = '<p class="empty-msg">No percentage data available.</p>';
+            return;
+        }
+
+        const summary = {};
+        records.forEach(r => {
+            const key = r.student_id;
+            if (!summary[key]) {
+                summary[key] = {
+                    usn: r.usn,
+                    name: r.name,
+                    department: r.department,
+                    present: 0,
+                    total: 0
+                };
+            }
+            summary[key].total++;
+            if (r.status === "Present") summary[key].present++;
+        });
+
+        const rows = Object.values(summary).sort((a, b) => String(a.usn).localeCompare(String(b.usn)));
+
+        let html = `<table>
+            <thead>
+                <tr>
+                    <th>USN</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Present</th>
+                    <th>Total</th>
+                    <th>Percentage</th>
+                    <th>Remark</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        rows.forEach(s => {
+            const percent = s.total > 0 ? Math.round((s.present / s.total) * 100) : 0;
+            const isLow = percent < 75;
+            html += `<tr class="${isLow ? 'warning-row' : ''}">
+                <td>${escapeHtml(s.usn)}</td>
+                <td>${escapeHtml(s.name)}</td>
+                <td>${escapeHtml(s.department)}</td>
+                <td>${s.present}</td>
+                <td>${s.total}</td>
+                <td><b>${percent}%</b></td>
+                <td>${isLow ? '<span class="badge badge-warning">Below 75%</span>' : '<span class="badge badge-present">Good</span>'}</td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        document.getElementById("percentage-table").innerHTML = html;
+    }
+
+    function drawAttendanceGraph(records) {
+        const canvas = document.getElementById("attendanceChart");
+        const ctx = canvas.getContext("2d");
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const presentTotal = records.filter(r => r.status === "Present").length;
+        const absentTotal = records.filter(r => r.status === "Absent").length;
+        document.getElementById("sum-present").textContent = presentTotal;
+        document.getElementById("sum-absent").textContent = absentTotal;
+        document.getElementById("sum-records").textContent = records.length;
+
+        const grouped = {};
+        records.forEach(r => {
+            if (!grouped[r.date]) grouped[r.date] = { Present: 0, Absent: 0 };
+            if (r.status === "Present") grouped[r.date].Present++;
+            if (r.status === "Absent") grouped[r.date].Absent++;
+        });
+
+        const dates = Object.keys(grouped).sort();
+
+        if (dates.length === 0) {
+            ctx.font = "16px Arial";
+            ctx.fillStyle = "#777";
+            ctx.fillText("No attendance data available for graph.", 270, 160);
+            return;
+        }
+
+        const paddingLeft = 55;
+        const paddingBottom = 55;
+        const top = 25;
+        const chartHeight = canvas.height - paddingBottom - top;
+        const chartWidth = canvas.width - paddingLeft - 25;
+        const maxValue = Math.max(...dates.map(d => Math.max(grouped[d].Present, grouped[d].Absent)), 1);
+        const groupWidth = chartWidth / dates.length;
+        const barWidth = Math.min(28, groupWidth / 4);
+
+        ctx.strokeStyle = "#333";
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(paddingLeft, top);
+        ctx.lineTo(paddingLeft, canvas.height - paddingBottom);
+        ctx.lineTo(canvas.width - 20, canvas.height - paddingBottom);
+        ctx.stroke();
+
+        ctx.font = "12px Arial";
+        ctx.fillStyle = "#555";
+        for (let i = 0; i <= maxValue; i++) {
+            const y = canvas.height - paddingBottom - (i / maxValue) * chartHeight;
+            ctx.fillText(i, 25, y + 4);
+            ctx.strokeStyle = "#eee";
+            ctx.beginPath();
+            ctx.moveTo(paddingLeft, y);
+            ctx.lineTo(canvas.width - 20, y);
+            ctx.stroke();
+        }
+
+        dates.forEach((date, index) => {
+            const xCenter = paddingLeft + groupWidth * index + groupWidth / 2;
+            const presentHeight = (grouped[date].Present / maxValue) * chartHeight;
+            const absentHeight = (grouped[date].Absent / maxValue) * chartHeight;
+            const baseY = canvas.height - paddingBottom;
+
+            ctx.fillStyle = "#27ae60";
+            ctx.fillRect(xCenter - barWidth - 2, baseY - presentHeight, barWidth, presentHeight);
+
+            ctx.fillStyle = "#e74c3c";
+            ctx.fillRect(xCenter + 2, baseY - absentHeight, barWidth, absentHeight);
+
+            ctx.fillStyle = "#333";
+            ctx.font = "11px Arial";
+            ctx.save();
+            ctx.translate(xCenter - 18, baseY + 38);
+            ctx.rotate(-0.55);
+            ctx.fillText(date, 0, 0);
+            ctx.restore();
+        });
+    }
+
+    function clearFilters() {
+        document.getElementById("filter-date").value = "";
+        document.getElementById("filter-dept").value = "";
+        loadReport();
+    }
+
+    function csvEscape(value) {
+        const text = String(value ?? "");
+        if (text.includes(",") || text.includes("\n") || text.includes('"')) {
+            return '"' + text.replace(/"/g, '""') + '"';
+        }
+        return text;
+    }
+
+    function exportReportCSV() {
+        if (currentRecords.length === 0) {
+            showImportMessage("error", "No records to export.");
+            return;
+        }
+
+        const headers = ["USN", "Name", "Department", "Date", "Status"];
+        const rows = currentRecords.map(r => [r.usn, r.name, r.department, r.date, r.status]);
+        const csv = [headers, ...rows].map(row => row.map(csvEscape).join(",")).join("\n");
+
+        const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "attendance_report.csv";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+
+    function parseCSV(text) {
+        const rows = [];
+        let row = [];
+        let cell = "";
+        let inQuotes = false;
+
+        for (let i = 0; i < text.length; i++) {
+            const char = text[i];
+            const next = text[i + 1];
+
+            if (char === '"' && inQuotes && next === '"') {
+                cell += '"';
+                i++;
+            } else if (char === '"') {
+                inQuotes = !inQuotes;
+            } else if (char === ',' && !inQuotes) {
+                row.push(cell.trim());
+                cell = "";
+            } else if ((char === '\n' || char === '\r') && !inQuotes) {
+                if (char === '\r' && next === '\n') i++;
+                row.push(cell.trim());
+                if (row.some(v => v !== "")) rows.push(row);
+                row = [];
+                cell = "";
+            } else {
+                cell += char;
+            }
+        }
+
+        row.push(cell.trim());
+        if (row.some(v => v !== "")) rows.push(row);
+        return rows;
+    }
+
+    function importReportCSV() {
+        const fileInput = document.getElementById("import-file");
+        const file = fileInput.files[0];
+
+        if (!file) {
+            showImportMessage("error", "Please choose a CSV file first.");
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const rows = parseCSV(e.target.result);
+            if (rows.length < 2) {
+                showImportMessage("error", "CSV must contain a header row and at least one attendance row.");
+                return;
+            }
+
+            const header = rows[0].map(h => h.toLowerCase().replace(/\s+/g, ""));
+            const usnIndex = header.indexOf("usn");
+            const dateIndex = header.indexOf("date");
+            const statusIndex = header.indexOf("status");
+
+            if (usnIndex === -1 || dateIndex === -1 || statusIndex === -1) {
+                showImportMessage("error", "CSV header must include USN, Date, and Status.");
+                return;
+            }
+
+            const records = rows.slice(1).map(row => ({
+                usn: row[usnIndex] || "",
+                date: row[dateIndex] || "",
+                status: row[statusIndex] || ""
+            })).filter(r => r.usn && r.date && r.status);
+
+            if (records.length === 0) {
+                showImportMessage("error", "No valid rows found in CSV.");
+                return;
+            }
+
+            fetch("api/import_attendance.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ records })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    showImportMessage("success", `Import complete. Saved: ${data.saved}, Failed: ${data.failed}.`);
+                    fileInput.value = "";
+                    loadAvailableFilters();
+                } else {
+                    showImportMessage("error", data.error || "Import failed.");
+                }
+            })
+            .catch(() => showImportMessage("error", "Server error while importing. Is XAMPP running?"));
+        };
+
+        reader.readAsText(file);
+    }
+
+    function showImportMessage(type, text) {
+        document.getElementById("import-success").style.display = "none";
+        document.getElementById("import-error").style.display = "none";
+
+        const el = document.getElementById("import-" + type);
+        el.textContent = text;
+        el.style.display = "block";
+
+        setTimeout(() => { el.style.display = "none"; }, 6000);
+    }
+</script>
+
+</body>
+</html>

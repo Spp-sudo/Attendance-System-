@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System - Students</title>
+    <link rel="stylesheet" href="style.css">
+
+    <style>
+        .btn-danger {
+            background-color: #e74c3c;
+            color: #fff;
+            padding: 6px 12px;
+            font-size: 13px;
+        }
+
+        .btn-danger:hover { background-color: #c0392b; }
+
+        .btn-warning {
+            background-color: #f39c12;
+            color: #fff;
+            padding: 6px 12px;
+            font-size: 13px;
+            margin-right: 6px;
+        }
+
+        .btn-warning:hover { background-color: #d68910; }
+
+        .btn-secondary {
+            background-color: #7f8c8d;
+            color: #fff;
+        }
+
+        .btn-secondary:hover { background-color: #626f70; }
+
+        .actions { display: flex; gap: 6px; flex-wrap: wrap; }
+
+        .search-box {
+            margin-bottom: 14px;
+            max-width: 360px;
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Student Attendance System</span>
+    <a href="index.html">Home</a>
+    <a href="students.html" class="active">Students</a>
+    <a href="attendance.html">Mark Attendance</a>
+    <a href="report.html">Report</a>
+</nav>
+
+<div class="container">
+
+    <div class="card">
+        <h2 id="form-title">Add New Student</h2>
+
+        <div class="alert alert-success" id="msg-success">Student saved successfully!</div>
+        <div class="alert alert-error" id="msg-error">Something went wrong. Try again.</div>
+
+        <input type="hidden" id="edit-student-id">
+
+        <div class="form-group">
+            <label for="student-usn">USN</label>
+            <input type="text" id="student-usn" placeholder="e.g., 1SP24CS001">
+        </div>
+
+        <div class="form-group">
+            <label for="student-name">Student Name</label>
+            <input type="text" id="student-name" placeholder="e.g., Alice Johnson">
+        </div>
+
+        <div class="form-group">
+            <label for="student-dept">Department</label>
+            <input type="text" id="student-dept" placeholder="e.g., CSE, ECE, MECH">
+        </div>
+
+        <button class="btn btn-primary" id="save-btn" onclick="saveStudent()">Add Student</button>
+        <button class="btn btn-secondary" id="cancel-edit-btn" onclick="cancelEdit()" style="display:none;">Cancel Edit</button>
+    </div>
+
+    <div class="card">
+        <h2>All Students</h2>
+
+        <div class="form-group search-box">
+            <label for="student-search">Search Student</label>
+            <input type="text" id="student-search" placeholder="Search by USN, name, or department" oninput="renderStudents()">
+        </div>
+
+        <div id="students-table">
+            <p class="empty-msg">Loading students...</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    let allStudents = [];
+
+    loadStudents();
+
+    function escapeHtml(value) {
+        return String(value ?? "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function escapeJs(value) {
+        return String(value ?? "")
+            .replace(/\\/g, "\\\\")
+            .replace(/'/g, "\\'")
+            .replace(/"/g, "\\\"")
+            .replace(/\n/g, "\\n")
+            .replace(/\r/g, "");
+    }
+
+    function loadStudents() {
+        fetch("api/students.php")
+            .then(res => res.json())
+            .then(students => {
+                allStudents = Array.isArray(students) ? students : [];
+                renderStudents();
+            })
+            .catch(() => {
+                document.getElementById("students-table").innerHTML =
+                    '<p class="empty-msg">Failed to load students. Is the server running?</p>';
+            });
+    }
+
+    function renderStudents() {
+        const container = document.getElementById("students-table");
+        const search = document.getElementById("student-search").value.trim().toLowerCase();
+
+        const students = allStudents.filter(s => {
+            const text = `${s.usn || ""} ${s.name || ""} ${s.department || ""}`.toLowerCase();
+            return text.includes(search);
+        });
+
+        if (students.length === 0) {
+            container.innerHTML = '<p class="empty-msg">No students found.</p>';
+            return;
+        }
+
+        let html = `<table>
+            <thead>
+                <tr>
+                    <th>USN</th>
+                    <th>Name</th>
+                    <th>Department</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>`;
+
+        students.forEach(s => {
+            html += `<tr>
+                <td>${escapeHtml(s.usn)}</td>
+                <td>${escapeHtml(s.name)}</td>
+                <td>${escapeHtml(s.department)}</td>
+                <td>
+                    <div class="actions">
+                        <button class="btn btn-warning" onclick="startEdit(${Number(s.student_id)}, '${escapeJs(s.usn)}', '${escapeJs(s.name)}', '${escapeJs(s.department)}')">Edit</button>
+                        <button class="btn btn-danger" onclick="deleteStudent(${Number(s.student_id)}, '${escapeJs(s.name)}')">Delete</button>
+                    </div>
+                </td>
+            </tr>`;
+        });
+
+        html += `</tbody></table>`;
+        container.innerHTML = html;
+    }
+
+    function saveStudent() {
+        const studentId = document.getElementById("edit-student-id").value;
+        const usn = document.getElementById("student-usn").value.trim().toUpperCase();
+        const name = document.getElementById("student-name").value.trim();
+        const department = document.getElementById("student-dept").value.trim().toUpperCase();
+
+        if (!usn || !name || !department) {
+            showMessage("error", "Please fill in USN, name, and department.");
+            return;
+        }
+
+        const isEditing = studentId !== "";
+
+        fetch("api/students.php", {
+            method: isEditing ? "PUT" : "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                student_id: studentId,
+                usn: usn,
+                name: name,
+                department: department
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showMessage("success", isEditing ? "Student updated successfully!" : "Student added successfully!");
+                clearForm();
+                loadStudents();
+            } else {
+                showMessage("error", data.error || "Failed to save student.");
+            }
+        })
+        .catch(() => showMessage("error", "Server error. Make sure XAMPP is running."));
+    }
+
+    function startEdit(studentId, usn, name, department) {
+        document.getElementById("edit-student-id").value = studentId;
+        document.getElementById("student-usn").value = usn;
+        document.getElementById("student-name").value = name;
+        document.getElementById("student-dept").value = department;
+
+        document.getElementById("form-title").textContent = "Edit Student";
+        document.getElementById("save-btn").textContent = "Update Student";
+        document.getElementById("cancel-edit-btn").style.display = "inline-block";
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function cancelEdit() {
+        clearForm();
+    }
+
+    function clearForm() {
+        document.getElementById("edit-student-id").value = "";
+        document.getElementById("student-usn").value = "";
+        document.getElementById("student-name").value = "";
+        document.getElementById("student-dept").value = "";
+        document.getElementById("form-title").textContent = "Add New Student";
+        document.getElementById("save-btn").textContent = "Add Student";
+        document.getElementById("cancel-edit-btn").style.display = "none";
+    }
+
+    function deleteStudent(studentId, studentName) {
+        const confirmDelete = confirm("Delete " + studentName + "? This will also remove their attendance records.");
+
+        if (!confirmDelete) return;
+
+        fetch("api/students.php", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ student_id: studentId })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                showMessage("success", "Student deleted successfully!");
+                loadStudents();
+            } else {
+                showMessage("error", data.error || "Failed to delete student.");
+            }
+        })
+        .catch(() => showMessage("error", "Server error. Make sure XAMPP is running."));
+    }
+
+    function showMessage(type, text) {
+        document.getElementById("msg-success").style.display = "none";
+        document.getElementById("msg-error").style.display = "none";
+
+        const el = document.getElementById("msg-" + type);
+        el.textContent = text;
+        el.style.display = "block";
+
+        setTimeout(() => { el.style.display = "none"; }, 3500);
+    }
+</script>
+
+</body>
+</html>

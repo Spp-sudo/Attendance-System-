@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System - Mark Attendance</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .page-header h2 {
+            border-bottom: none;
+            padding-bottom: 0;
+            margin-bottom: 6px;
+        }
+
+        .muted {
+            color: #6b7280;
+            font-size: 14px;
+        }
+
+        .toolbar {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 14px;
+            align-items: end;
+        }
+
+        .toolbar-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .mini-stats {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(130px, 1fr));
+            gap: 14px;
+            margin-top: 18px;
+        }
+
+        .mini-stat {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 16px;
+            background: #f9fafb;
+        }
+
+        .mini-stat .number {
+            font-size: 28px;
+            font-weight: 800;
+            color: #2c3e50;
+            line-height: 1;
+        }
+
+        .mini-stat .label {
+            margin-top: 6px;
+            color: #6b7280;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .controls-row {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr auto auto;
+            gap: 12px;
+            align-items: end;
+            margin-bottom: 16px;
+        }
+
+        .chip-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 14px;
+        }
+
+        .btn-soft {
+            background: #eef2ff;
+            color: #243b70;
+        }
+
+        .btn-soft:hover {
+            background: #dfe6ff;
+        }
+
+        .btn-danger-soft {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .btn-danger-soft:hover {
+            background: #fecaca;
+        }
+
+        .attendance-card {
+            border: 1px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 14px;
+            margin-bottom: 12px;
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            align-items: center;
+            background: #fff;
+            transition: transform 0.15s, box-shadow 0.15s, border-color 0.15s;
+        }
+
+        .attendance-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+            border-color: #cbd5e1;
+        }
+
+        .student-main {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .avatar {
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: #2980b9;
+            color: #fff;
+            display: grid;
+            place-items: center;
+            font-weight: 800;
+            flex: 0 0 auto;
+        }
+
+        .student-name {
+            font-weight: 800;
+            color: #1f2937;
+            margin-bottom: 4px;
+        }
+
+        .student-meta {
+            color: #6b7280;
+            font-size: 13px;
+        }
+
+        .status-toggle {
+            display: flex;
+            gap: 8px;
+            background: #f3f4f6;
+            padding: 6px;
+            border-radius: 999px;
+        }
+
+        .status-toggle input {
+            display: none;
+        }
+
+        .status-toggle label {
+            cursor: pointer;
+            padding: 8px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 800;
+            color: #4b5563;
+            user-select: none;
+        }
+
+        .status-toggle input[value="Present"]:checked + label {
+            background: #d5f5e3;
+            color: #1e8449;
+        }
+
+        .status-toggle input[value="Absent"]:checked + label {
+            background: #fadbd8;
+            color: #922b21;
+        }
+
+        .save-bar {
+            position: sticky;
+            bottom: 0;
+            background: rgba(255,255,255,0.95);
+            border-top: 1px solid #e5e7eb;
+            padding: 14px 0 0;
+            margin-top: 12px;
+            backdrop-filter: blur(6px);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 32px 16px;
+            background: #f9fafb;
+            border: 1px dashed #cbd5e1;
+            border-radius: 12px;
+            color: #6b7280;
+        }
+
+        .small-note {
+            font-size: 13px;
+            color: #6b7280;
+        }
+
+        @media (max-width: 760px) {
+            .toolbar,
+            .controls-row,
+            .attendance-card {
+                grid-template-columns: 1fr;
+            }
+
+            .mini-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .status-toggle {
+                width: 100%;
+                justify-content: space-between;
+            }
+
+            .status-toggle label {
+                flex: 1;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<nav>
+    <span class="brand">Student Attendance System</span>
+    <a href="index.html">Home</a>
+    <a href="students.html">Students</a>
+    <a href="attendance.html" class="active">Mark Attendance</a>
+    <a href="report.html">Report</a>
+</nav>
+
+<div class="container">
+
+    <div class="card">
+        <div class="page-header">
+            <div>
+                <h2>Mark Attendance</h2>
+                <p class="muted">Select a date, load students, then mark Present or Absent.</p>
+            </div>
+            <div class="small-note" id="today-label"></div>
+        </div>
+
+        <div class="toolbar" style="margin-top:18px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label for="att-date">Attendance Date</label>
+                <input type="date" id="att-date">
+            </div>
+            <div class="toolbar-actions">
+                <button class="btn btn-primary" onclick="loadStudentsForAttendance()">Load Students</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card" id="attendance-section" style="display:none;">
+        <div class="page-header">
+            <div>
+                <h2>Attendance for <span id="selected-date-label"></span></h2>
+                <p class="muted">Use search and department filter to find students quickly.</p>
+            </div>
+        </div>
+
+        <div class="alert alert-success" id="msg-success"></div>
+        <div class="alert alert-error" id="msg-error"></div>
+
+        <div class="mini-stats">
+            <div class="mini-stat">
+                <div class="number" id="stat-total">0</div>
+                <div class="label">Loaded Students</div>
+            </div>
+            <div class="mini-stat">
+                <div class="number" id="stat-present" style="color:#27ae60;">0</div>
+                <div class="label">Present</div>
+            </div>
+            <div class="mini-stat">
+                <div class="number" id="stat-absent" style="color:#e74c3c;">0</div>
+                <div class="label">Absent</div>
+            </div>
+        </div>
+
+        <div class="controls-row" style="margin-top:20px;">
+            <div class="form-group" style="margin-bottom:0;">
+                <label for="search-student">Search Student</label>
+                <input type="text" id="search-student" placeholder="Search by USN or name..." oninput="renderAttendanceCards()">
+            </div>
+            <div class="form-group" style="margin-bottom:0;">
+                <label for="filter-department">Department</label>
+                <select id="filter-department" onchange="renderAttendanceCards()">
+                    <option value="">All Departments</option>
+                </select>
+            </div>
+            <button class="btn btn-soft" onclick="markAll('Present')">Mark All Present</button>
+            <button class="btn btn-danger-soft" onclick="markAll('Absent')">Mark All Absent</button>
+        </div>
+
+        <div class="chip-actions">
+            <button class="btn" style="background:#e0e0e0; color:#333;" onclick="clearSearchAndFilter()">Clear Search/Filter</button>
+            <button class="btn" style="background:#e0e0e0; color:#333;" onclick="loadStudentsForAttendance()">Reload</button>
+        </div>
+
+        <div id="attendance-list"></div>
+
+        <div class="save-bar">
+            <div class="small-note" id="visible-count-label">Showing 0 students</div>
+            <button class="btn btn-success" onclick="submitAllAttendance()">Save Attendance</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    const today = new Date().toISOString().split("T")[0];
+    document.getElementById("att-date").value = today;
+    document.getElementById("today-label").textContent = "Today: " + today;
+
+    let students = [];
+    let attendanceStatus = {};
+
+    function escapeHtml(value) {
+        return String(value ?? "").replace(/[&<>'"]/g, function (char) {
+            return {
+                "&": "&amp;",
+                "<": "&lt;",
+                ">": "&gt;",
+                "'": "&#039;",
+                '"': "&quot;"
+            }[char];
+        });
+    }
+
+    function loadStudentsForAttendance() {
+        const date = document.getElementById("att-date").value;
+
+        if (!date) {
+            showMessage("error", "Please select a date first.");
+            return;
+        }
+
+        document.getElementById("attendance-section").style.display = "block";
+        document.getElementById("selected-date-label").textContent = date;
+        document.getElementById("attendance-list").innerHTML = '<div class="empty-state">Loading students...</div>';
+
+        fetch("api/students.php")
+            .then(res => res.json())
+            .then(data => {
+                students = Array.isArray(data) ? data : [];
+
+                if (students.length === 0) {
+                    document.getElementById("attendance-list").innerHTML = '<div class="empty-state">No students found. Add students first.</div>';
+                    updateStats();
+                    return;
+                }
+
+                fetch("api/attendance.php?date=" + encodeURIComponent(date))
+                    .then(res => res.json())
+                    .then(existing => {
+                        attendanceStatus = {};
+
+                        students.forEach(s => {
+                            attendanceStatus[s.student_id] = "Present";
+                        });
+
+                        if (Array.isArray(existing)) {
+                            existing.forEach(r => {
+                                attendanceStatus[r.student_id] = r.status;
+                            });
+                        }
+
+                        buildDepartmentDropdown();
+                        renderAttendanceCards();
+                        showMessage("success", "Students loaded successfully.");
+                    });
+            })
+            .catch(() => {
+                document.getElementById("attendance-list").innerHTML = '<div class="empty-state">Server error. Make sure XAMPP is running and API files are inside the api folder.</div>';
+                showMessage("error", "Server error. Is XAMPP running?");
+            });
+    }
+
+    function buildDepartmentDropdown() {
+        const select = document.getElementById("filter-department");
+        const current = select.value;
+        const departments = [...new Set(students.map(s => s.department).filter(Boolean))].sort();
+
+        select.innerHTML = '<option value="">All Departments</option>';
+        departments.forEach(dept => {
+            select.innerHTML += `<option value="${escapeHtml(dept)}">${escapeHtml(dept)}</option>`;
+        });
+
+        if (departments.includes(current)) {
+            select.value = current;
+        }
+    }
+
+    function getFilteredStudents() {
+        const search = document.getElementById("search-student").value.trim().toLowerCase();
+        const department = document.getElementById("filter-department").value;
+
+        return students.filter(s => {
+            const matchesSearch = !search ||
+                String(s.usn || "").toLowerCase().includes(search) ||
+                String(s.name || "").toLowerCase().includes(search);
+
+            const matchesDepartment = !department || s.department === department;
+            return matchesSearch && matchesDepartment;
+        });
+    }
+
+    function renderAttendanceCards() {
+        const list = document.getElementById("attendance-list");
+        const filtered = getFilteredStudents();
+
+        if (filtered.length === 0) {
+            list.innerHTML = '<div class="empty-state">No students match your search/filter.</div>';
+            document.getElementById("visible-count-label").textContent = "Showing 0 students";
+            updateStats();
+            return;
+        }
+
+        let html = "";
+        filtered.forEach((s, index) => {
+            const status = attendanceStatus[s.student_id] || "Present";
+            const initials = String(s.name || "S").trim().charAt(0).toUpperCase() || "S";
+            const presentId = `present_${s.student_id}`;
+            const absentId = `absent_${s.student_id}`;
+
+            html += `
+                <div class="attendance-card">
+                    <div class="student-main">
+                        <div class="avatar">${escapeHtml(initials)}</div>
+                        <div>
+                            <div class="student-name">${index + 1}. ${escapeHtml(s.name)}</div>
+                            <div class="student-meta">USN: ${escapeHtml(s.usn)} &nbsp; | &nbsp; Department: ${escapeHtml(s.department)}</div>
+                        </div>
+                    </div>
+                    <div class="status-toggle">
+                        <input type="radio" id="${presentId}" name="status_${s.student_id}" value="Present" ${status === "Present" ? "checked" : ""} onchange="setStatus('${s.student_id}', 'Present')">
+                        <label for="${presentId}">Present</label>
+                        <input type="radio" id="${absentId}" name="status_${s.student_id}" value="Absent" ${status === "Absent" ? "checked" : ""} onchange="setStatus('${s.student_id}', 'Absent')">
+                        <label for="${absentId}">Absent</label>
+                    </div>
+                </div>`;
+        });
+
+        list.innerHTML = html;
+        document.getElementById("visible-count-label").textContent = `Showing ${filtered.length} of ${students.length} students`;
+        updateStats();
+    }
+
+    function setStatus(studentId, status) {
+        attendanceStatus[studentId] = status;
+        updateStats();
+    }
+
+    function markAll(status) {
+        const filtered = getFilteredStudents();
+        filtered.forEach(s => {
+            attendanceStatus[s.student_id] = status;
+        });
+        renderAttendanceCards();
+        showMessage("success", `Marked ${filtered.length} visible students as ${status}.`);
+    }
+
+    function clearSearchAndFilter() {
+        document.getElementById("search-student").value = "";
+        document.getElementById("filter-department").value = "";
+        renderAttendanceCards();
+    }
+
+    function updateStats() {
+        let present = 0;
+        let absent = 0;
+
+        students.forEach(s => {
+            if (attendanceStatus[s.student_id] === "Absent") {
+                absent++;
+            } else {
+                present++;
+            }
+        });
+
+        document.getElementById("stat-total").textContent = students.length;
+        document.getElementById("stat-present").textContent = present;
+        document.getElementById("stat-absent").textContent = absent;
+    }
+
+    function submitAllAttendance() {
+        const date = document.getElementById("att-date").value;
+
+        if (students.length === 0) {
+            showMessage("error", "No students loaded.");
+            return;
+        }
+
+        const saveButton = document.querySelector(".save-bar .btn-success");
+        saveButton.disabled = true;
+        saveButton.textContent = "Saving...";
+
+        const requests = students.map(s => {
+            return fetch("api/attendance.php", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    student_id: s.student_id,
+                    date: date,
+                    status: attendanceStatus[s.student_id] || "Present"
+                })
+            }).then(res => res.json());
+        });
+
+        Promise.all(requests)
+            .then(results => {
+                const allOk = results.every(r => r.success);
+                if (allOk) {
+                    showMessage("success", "Attendance saved successfully for all students.");
+                } else {
+                    showMessage("error", "Some records failed. Please try again.");
+                }
+            })
+            .catch(() => showMessage("error", "Server error. Try again."))
+            .finally(() => {
+                saveButton.disabled = false;
+                saveButton.textContent = "Save Attendance";
+            });
+    }
+
+    function showMessage(type, text) {
+        document.getElementById("msg-success").style.display = "none";
+        document.getElementById("msg-error").style.display = "none";
+
+        const el = document.getElementById("msg-" + type);
+        el.textContent = text;
+        el.style.display = "block";
+
+        setTimeout(() => { el.style.display = "none"; }, 3500);
+    }
+</script>
+
+</body>
+</html>

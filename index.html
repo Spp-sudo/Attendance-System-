@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attendance System - Home</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- Navigation Bar -->
+<nav>
+    <span class="brand">Student Attendance System</span>
+    <a href="index.html" class="active">Home</a>
+    <a href="students.html">Students</a>
+    <a href="attendance.html">Mark Attendance</a>
+    <a href="report.html">Report</a>
+</nav>
+
+<!-- Main Content -->
+<div class="container">
+
+    <!-- Page Title -->
+    <div class="card">
+        <h2>Dashboard</h2>
+        <p style="color:#666; font-size:14px;">Welcome to the Student Attendance Management System.</p>
+    </div>
+
+    <!-- Stats Section -->
+    <div class="stats-grid">
+        <div class="stat-box">
+            <div class="stat-number" id="total-students">...</div>
+            <div class="stat-label">Total Students</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" id="today-present" style="color:#27ae60;">...</div>
+            <div class="stat-label">Present Today</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" id="today-absent" style="color:#e74c3c;">...</div>
+            <div class="stat-label">Absent Today</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-number" id="total-records">...</div>
+            <div class="stat-label">Total Records</div>
+        </div>
+    </div>
+
+    <!-- Quick Links -->
+    <div class="card">
+        <h2>Quick Actions</h2>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <a href="students.html" class="btn btn-primary">Add Student</a>
+            <a href="attendance.html" class="btn btn-success">Mark Attendance</a>
+            <a href="report.html" class="btn btn-primary">View Report</a>
+        </div>
+    </div>
+
+    <!-- Recent Attendance Table -->
+    <div class="card">
+        <h2>Recent Attendance (Last 10 Records)</h2>
+        <div id="recent-table">
+            <p class="empty-msg">Loading...</p>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // ---- Load dashboard stats and recent records ----
+
+    // Get today's date in YYYY-MM-DD format
+    const today = new Date().toISOString().split("T")[0];
+
+    // Fetch all students to count total
+    fetch("api/students.php")
+        .then(res => res.json())
+        .then(students => {
+            document.getElementById("total-students").textContent = students.length;
+        });
+
+    // Fetch today's attendance to count present/absent
+    fetch("api/attendance.php?date=" + today)
+        .then(res => res.json())
+        .then(records => {
+            let present = records.filter(r => r.status === "Present").length;
+            let absent = records.filter(r => r.status === "Absent").length;
+            document.getElementById("today-present").textContent = present;
+            document.getElementById("today-absent").textContent = absent;
+        });
+
+    // Fetch all attendance records
+    fetch("api/attendance.php")
+        .then(res => res.json())
+        .then(records => {
+            document.getElementById("total-records").textContent = records.length;
+
+            // Show last 10 records in a table
+            const recent = records.slice(0, 10);
+            if (recent.length === 0) {
+                document.getElementById("recent-table").innerHTML =
+                    '<p class="empty-msg">No attendance records yet.</p>';
+                return;
+            }
+
+            let html = `<table>
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>USN</th>
+                        <th>Student Name</th>
+                        <th>Department</th>
+                        <th>Date</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            recent.forEach((r, i) => {
+                const badge = r.status === "Present"
+                    ? `<span class="badge badge-present">Present</span>`
+                    : `<span class="badge badge-absent">Absent</span>`;
+                html += `<tr>
+                    <td>${i + 1}</td>
+                    <td>${r.usn}</td>
+                    <td>${r.name}</td>
+                    <td>${r.department}</td>
+                    <td>${r.date}</td>
+                    <td>${badge}</td>
+                </tr>`;
+            });
+
+            html += `</tbody></table>`;
+            document.getElementById("recent-table").innerHTML = html;
+        });
+</script>
+
+</body>
+</html>
